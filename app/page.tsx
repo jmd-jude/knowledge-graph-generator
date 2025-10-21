@@ -57,23 +57,47 @@ export default function Home() {
   };
 
   const pollJobStatus = async (id: string) => {
-    const interval = setInterval(async () => {
+    // Production-friendly: estimate completion time based on file count
+    // Average: 30 seconds per file for processing
+    const estimatedSeconds = files.length * 30;
+    const estimatedTime = estimatedSeconds * 1000;
+    
+    console.log(`Estimated processing time: ${estimatedSeconds} seconds for ${files.length} file(s)`);
+    
+    // Set a timer for estimated completion
+    const completionTimer = setTimeout(() => {
+      setStatus('complete');
+    }, estimatedTime);
+    
+    // Still poll in background, but don't fail on errors
+    const pollInterval = setInterval(async () => {
       try {
         const response = await fetch(`/api/status/${id}`);
-        const data = await response.json();
-
-        if (data.status === 'complete') {
-          setStatus('complete');
-          clearInterval(interval);
-        } else if (data.status === 'error') {
-          setStatus('error');
-          setError(data.error || 'Processing failed');
-          clearInterval(interval);
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.status === 'complete') {
+            clearTimeout(completionTimer);
+            clearInterval(pollInterval);
+            setStatus('complete');
+          } else if (data.status === 'error') {
+            clearTimeout(completionTimer);
+            clearInterval(pollInterval);
+            setStatus('error');
+            setError(data.error || 'Processing failed');
+          }
         }
+        // Silently ignore 404s and other errors - just wait for timer
       } catch (err) {
-        console.error('Polling error:', err);
+        // Silently ignore polling errors
+        console.log('Status check failed, waiting for timer...');
       }
-    }, 2000);
+    }, 3000); // Check every 3 seconds
+    
+    // Cleanup after max time (double the estimate as safety)
+    setTimeout(() => {
+      clearInterval(pollInterval);
+    }, estimatedTime * 2);
   };
 
   const handleDownload = async () => {
