@@ -6,7 +6,6 @@ export async function GET(
   { params }: { params: { jobId: string } }
 ) {
   const { jobId } = params;
-
   const job = jobs.get(jobId);
 
   if (!job) {
@@ -23,18 +22,13 @@ export async function GET(
     );
   }
 
-  if (!job.zipBuffer) {
+  if (!job.downloadUrl) {
     return NextResponse.json(
-      { error: 'Result file not found' },
+      { error: 'Download link not available' },
       { status: 404 }
     );
   }
 
-  // Return the actual generated ZIP
-  return new NextResponse(job.zipBuffer, {
-    headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="knowledge-graph-${jobId}.zip"`,
-    },
-  });
+  // Redirect to Vercel Blob URL for download
+  return NextResponse.redirect(job.downloadUrl);
 }

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateKnowledgeGraph } from '@/lib/engine';
 import { createKnowledgeGraphZip } from '@/lib/zip-utils';
 import { jobs } from '@/lib/jobs';
+import { put } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,6 +101,18 @@ async function processJob(
       result.files,
       result.metadata
     );
+
+    // Store in Vercel Blob
+    const blob = await put(`results/${jobId}.zip`, zipBuffer, {
+      access: 'public',
+      addRandomSuffix: false,
+    });
+
+    // Update job with blob URL
+    job.status = 'complete';
+    job.completedAt = new Date().toISOString();
+    job.resultUrl = blob.url;
+    job.downloadUrl = blob.url; // Direct download URL
 
     // Step 4: Store result (in production, save to Vercel Blob or similar)
     job.status = 'complete';
